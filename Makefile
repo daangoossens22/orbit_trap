@@ -12,7 +12,7 @@ $(info $(shell mkdir -p $(BUILD_DIR)))
 CXXFLAGS = -g -Wall -Wextra
 LDLIBS =
 
-# SOURCES = $(SRC_DIR)/main.cpp
+# SOURCES = src/main.cpp src/shader.cpp
 SOURCES = $(shell find $(SRC_DIR) -name *.cpp) # gets all cpp files in SRC_DIR
 CXXFLAGS += -I$(SRC_DIR)
 
