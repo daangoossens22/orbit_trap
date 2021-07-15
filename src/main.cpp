@@ -70,12 +70,13 @@ int main(int, char**)
     // Shader shader = Shader(vertex_path, fragment_path);
     Shader shader = Shader(vertex_path, fragment_path);
 
+    // fill screen with quad (rectangle/2 triangles)
     float vertices[] =
     {
-         0.5f,  0.5f, 0.0f,
-         0.5f, -0.5f, 0.0f,
-        -0.5f, -0.5f, 0.0f,
-        -0.5f,  0.5f, 0.0f
+         1.0f,  1.0f, 0.0f,
+         1.0f, -1.0f, 0.0f,
+        -1.0f, -1.0f, 0.0f,
+        -1.0f,  1.0f, 0.0f
     };
     unsigned int indices[] =
     {
