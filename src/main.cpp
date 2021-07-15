@@ -3,20 +3,30 @@
 #include "imgui_impl_opengl3.h"
 #include <stdio.h>
 
-#include <glad/gl.h>            // Initialize with gladLoadGL(...) or gladLoaderLoadGL()
+#include <glad/gl.h>
 #include <GLFW/glfw3.h>
 
 #include "shader.h"
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/matrix_transform_2d.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/string_cast.hpp>
 
 #include <iostream>
 
 const std::string vertex_path = "src/shader.vert";
 const std::string fragment_path = "src/shader.frag";
 
-static void glfw_error_callback(int error, const char* description)
-{
-    fprintf(stderr, "Glfw Error %d: %s\n", error, description);
-}
+const int width = 1280;
+const int heigth = 720;
+
+glm::mat3 pixel_to_mandel;
+const float scale_factor = 0.9;
+
+static void glfw_error_callback(int error, const char* description);
+static void zoom_by_scrolling_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 int main(int, char**)
 {
@@ -37,7 +47,7 @@ int main(int, char**)
 #endif
 
     // Create window with graphics context
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "ray marching", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(width, heigth, "ray marching", NULL, NULL);
     if (window == NULL)
         return 1;
     glfwMakeContextCurrent(window);
@@ -51,17 +61,16 @@ int main(int, char**)
         return 1;
     }
 
+    glfwSetScrollCallback(window, zoom_by_scrolling_callback);
+
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.IniFilename = NULL; // don't make imgui.ini file after running application
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
-    //ImGui::StyleColorsClassic();
 
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -103,6 +112,11 @@ int main(int, char**)
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
+    // for the mandelbrot starting range is; x: [-2.5, 1.0], y: [-1.0, 1.0]
+    glm::mat3 scale_matrix = glm::scale(glm::mat3(1.0f), glm::vec2(3.5f / (float)width, 2.0f / (float)heigth));
+    glm::mat3 translate_matrix = glm::translate(glm::mat3(1.0f), glm::vec2(-2.5f, -1.0f));
+    pixel_to_mandel = translate_matrix * scale_matrix * glm::mat3(1.0f);
+
     // Our state
     bool show_demo_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -110,12 +124,6 @@ int main(int, char**)
     // Main loop
     while (!glfwWindowShouldClose(window))
     {
-        // TODO keyboard inputs
-        // Poll and handle events (inputs, window resize, etc.)
-        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
-        // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
         glfwPollEvents();
 
         // Start the Dear ImGui frame
@@ -146,6 +154,10 @@ int main(int, char**)
         glClear(GL_COLOR_BUFFER_BIT);
 
         shader.use();
+
+        unsigned int uniform_buf = glGetUniformLocation(shader.ID, "pixel_to_mandel");
+        glUniformMatrix3fv(uniform_buf, 1, GL_FALSE, glm::value_ptr(pixel_to_mandel));
+
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
@@ -163,4 +175,36 @@ int main(int, char**)
     glfwTerminate();
 
     return 0;
+}
+
+static void zoom_by_scrolling_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    int display_w, display_h;
+    glfwGetFramebufferSize(window, &display_w, &display_h);
+
+    double xpos, ypos;
+    glfwGetCursorPos(window, &xpos, &ypos);
+    ypos = (double)display_h - ypos; // set origin to bottom left
+    // xpos /= (double)display_w;
+    // ypos = 1.0 - (ypos / (double)display_h); // set origin to bottom left
+
+    glm::vec3 mouse_pixel = glm::vec3(xpos, ypos, 1.0f);
+    glm::vec3 mouse_mandel = pixel_to_mandel * mouse_pixel;
+    mouse_mandel /= mouse_mandel.z;
+    
+    float temp_scale = (yoffset > 0) ? scale_factor : 1.0 / scale_factor;
+
+    // move mouse to origin
+    glm::mat3 trans = glm::translate(glm::mat3(1.0f), glm::vec2(-mouse_mandel.x, -mouse_mandel.y));
+    // scale
+    glm::mat3 scale = glm::scale(glm::mat3(1.0f), glm::vec2(temp_scale));
+    // move back
+    glm::mat3 trans_back = glm::translate(glm::mat3(1.0f), glm::vec2(mouse_mandel.x, mouse_mandel.y));
+    // apply to pixel_to_mandel
+    pixel_to_mandel = trans_back * scale * trans * pixel_to_mandel;
+}
+
+static void glfw_error_callback(int error, const char* description)
+{
+    fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }

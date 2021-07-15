@@ -2,7 +2,8 @@
 
 precision highp float;
 
-const int max_iterations = 100;
+const int max_iterations = 2048;
+uniform mat3 pixel_to_mandel;
 
 vec3 mandelbrot(vec2 coord)
 {
@@ -28,15 +29,11 @@ vec3 mandelbrot(vec2 coord)
 
 void main()
 {
-  // x = [-2.5, 1.0]
-  // y = [-1.0, 1.0]
-  vec2 coords = vec2(gl_FragCoord.x / 1280.0, gl_FragCoord.y / 720.0);
-  coords.x *= 3.5;
-  coords.x -= 2.5;
-  coords.y *= 2.0;
-  coords.y -= 1.0;
-  vec3 val = mandelbrot(coords);
-  gl_FragColor = vec4(val, 1.0);
+  vec3 coords_temp = pixel_to_mandel * vec3(gl_FragCoord.xy, 1.0);
+  vec2 coords = coords_temp.xy / coords_temp.z; // remove homogeneous coordinate
+
+  vec3 colour = mandelbrot(coords);
+  gl_FragColor = vec4(colour, 1.0);
 
   // gl_FragColor = vec4(0.0, 0.6, 1.0, 1.0);
 }
