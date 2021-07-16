@@ -24,9 +24,14 @@ const int heigth = 720;
 
 glm::mat3 pixel_to_mandel;
 const float scale_factor = 0.9;
+bool drag_started = false;
+double prev_cursor_x, prev_cursor_y;
 
-static void glfw_error_callback(int error, const char* description);
+
 static void zoom_by_scrolling_callback(GLFWwindow* window, double xoffset, double yoffset);
+static void drag_translation_callback(GLFWwindow* window, int button, int action, int mods);
+void get_cursor_pos(GLFWwindow* window, double& xpos, double& ypos);
+static void glfw_error_callback(int error, const char* description);
 
 int main(int, char**)
 {
@@ -62,6 +67,7 @@ int main(int, char**)
     }
 
     glfwSetScrollCallback(window, zoom_by_scrolling_callback);
+    glfwSetMouseButtonCallback(window, drag_translation_callback);
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -125,6 +131,23 @@ int main(int, char**)
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
+        if (drag_started)
+        {
+            double xpos, ypos;
+            get_cursor_pos(window, xpos, ypos);
+
+            double xdiff = prev_cursor_x - xpos;
+            double ydiff = prev_cursor_y - ypos;
+            // only works because only scaling and translations are used
+            xdiff *= pixel_to_mandel[0][0];
+            ydiff *= pixel_to_mandel[1][1];
+
+            prev_cursor_x = xpos;
+            prev_cursor_y = ypos;
+
+            glm::mat3 trans = glm::translate(glm::mat3(1.0f), glm::vec2(xdiff, ydiff));
+            pixel_to_mandel = trans * pixel_to_mandel;
+        }
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -179,15 +202,9 @@ int main(int, char**)
 
 static void zoom_by_scrolling_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    int display_w, display_h;
-    glfwGetFramebufferSize(window, &display_w, &display_h);
-
     double xpos, ypos;
-    glfwGetCursorPos(window, &xpos, &ypos);
-    ypos = (double)display_h - ypos; // set origin to bottom left
-    // xpos /= (double)display_w;
-    // ypos = 1.0 - (ypos / (double)display_h); // set origin to bottom left
-
+    get_cursor_pos(window, xpos, ypos);
+    
     glm::vec3 mouse_pixel = glm::vec3(xpos, ypos, 1.0f);
     glm::vec3 mouse_mandel = pixel_to_mandel * mouse_pixel;
     mouse_mandel /= mouse_mandel.z;
@@ -202,6 +219,36 @@ static void zoom_by_scrolling_callback(GLFWwindow* window, double xoffset, doubl
     glm::mat3 trans_back = glm::translate(glm::mat3(1.0f), glm::vec2(mouse_mandel.x, mouse_mandel.y));
     // apply to pixel_to_mandel
     pixel_to_mandel = trans_back * scale * trans * pixel_to_mandel;
+}
+
+static void drag_translation_callback(GLFWwindow* window, int button, int action, int mods)
+{
+    if (button == GLFW_MOUSE_BUTTON_LEFT)
+    {
+        if (action == GLFW_PRESS)
+        {
+            double xpos, ypos;
+            get_cursor_pos(window, xpos, ypos);
+
+            prev_cursor_x = xpos;
+            prev_cursor_y = ypos;
+
+            drag_started = true;
+        }
+        else if (action == GLFW_RELEASE)
+        {
+            drag_started = false;
+        }
+    }
+}
+
+void get_cursor_pos(GLFWwindow* window, double& xpos, double& ypos)
+{
+    int display_w, display_h;
+    glfwGetFramebufferSize(window, &display_w, &display_h);
+
+    glfwGetCursorPos(window, &xpos, &ypos);
+    ypos = (double)display_h - ypos; // set origin to bottom left
 }
 
 static void glfw_error_callback(int error, const char* description)
