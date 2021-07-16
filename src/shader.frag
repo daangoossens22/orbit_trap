@@ -1,17 +1,17 @@
-#version 330 core
+#version 400 core
 
-precision highp float;
+// precision highp float;
 
-const int max_iterations = 2048;
-uniform mat3 pixel_to_mandel;
+const int max_iterations = 256;
+uniform dmat3 pixel_to_mandel;
 
-vec3 mandelbrot(vec2 coord)
+vec3 mandelbrot(dvec2 coord)
 {
-  vec2 z = vec2(0.0);
+  dvec2 z = dvec2(0.0);
   int iteration = 0;
   while (iteration < max_iterations && length(z) < 2.0)
   {
-    z = vec2(z.x * z.x - z.y * z.y + coord.x, 2.0 * z.x * z.y + coord.y);
+    z = dvec2(z.x * z.x - z.y * z.y + coord.x, 2.0 * z.x * z.y + coord.y);
     iteration++;
   }
 
@@ -29,8 +29,8 @@ vec3 mandelbrot(vec2 coord)
 
 void main()
 {
-  vec3 coords_temp = pixel_to_mandel * vec3(gl_FragCoord.xy, 1.0);
-  vec2 coords = coords_temp.xy / coords_temp.z; // remove homogeneous coordinate
+  dvec3 coords_temp = pixel_to_mandel * dvec3(gl_FragCoord.xy, 1.0);
+  dvec2 coords = coords_temp.xy / coords_temp.z; // remove homogeneous coordinate
 
   vec3 colour = mandelbrot(coords);
   gl_FragColor = vec4(colour, 1.0);

@@ -22,7 +22,7 @@ const std::string fragment_path = "src/shader.frag";
 const int width = 1280;
 const int heigth = 720;
 
-glm::mat3 pixel_to_mandel;
+glm::dmat3 pixel_to_mandel;
 const float scale_factor = 0.9;
 bool drag_started = false;
 double prev_cursor_x, prev_cursor_y;
@@ -41,9 +41,12 @@ int main(int, char**)
         return 1;
 
     // Decide GL+GLSL versions
-    const char* glsl_version = "#version 330";
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    // const char* glsl_version = "#version 330";
+    // glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    // glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    const char* glsl_version = "#version 400";
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_FALSE);
@@ -119,9 +122,9 @@ int main(int, char**)
     glBindVertexArray(0);
 
     // for the mandelbrot starting range is; x: [-2.5, 1.0], y: [-1.0, 1.0]
-    glm::mat3 scale_matrix = glm::scale(glm::mat3(1.0f), glm::vec2(3.5f / (float)width, 2.0f / (float)heigth));
-    glm::mat3 translate_matrix = glm::translate(glm::mat3(1.0f), glm::vec2(-2.5f, -1.0f));
-    pixel_to_mandel = translate_matrix * scale_matrix * glm::mat3(1.0f);
+    glm::dmat3 scale_matrix = glm::scale(glm::dmat3(1.0f), glm::dvec2(3.5f / (float)width, 2.0f / (float)heigth));
+    glm::dmat3 translate_matrix = glm::translate(glm::dmat3(1.0f), glm::dvec2(-2.5f, -1.0f));
+    pixel_to_mandel = translate_matrix * scale_matrix * glm::dmat3(1.0f);
 
     // Our state
     bool show_demo_window = false;
@@ -145,7 +148,7 @@ int main(int, char**)
             prev_cursor_x = xpos;
             prev_cursor_y = ypos;
 
-            glm::mat3 trans = glm::translate(glm::mat3(1.0f), glm::vec2(xdiff, ydiff));
+            glm::dmat3 trans = glm::translate(glm::dmat3(1.0f), glm::dvec2(xdiff, ydiff));
             pixel_to_mandel = trans * pixel_to_mandel;
         }
 
@@ -179,7 +182,7 @@ int main(int, char**)
         shader.use();
 
         unsigned int uniform_buf = glGetUniformLocation(shader.ID, "pixel_to_mandel");
-        glUniformMatrix3fv(uniform_buf, 1, GL_FALSE, glm::value_ptr(pixel_to_mandel));
+        glUniformMatrix3dv(uniform_buf, 1, GL_FALSE, glm::value_ptr(pixel_to_mandel));
 
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -205,18 +208,18 @@ static void zoom_by_scrolling_callback(GLFWwindow* window, double xoffset, doubl
     double xpos, ypos;
     get_cursor_pos(window, xpos, ypos);
     
-    glm::vec3 mouse_pixel = glm::vec3(xpos, ypos, 1.0f);
-    glm::vec3 mouse_mandel = pixel_to_mandel * mouse_pixel;
+    glm::dvec3 mouse_pixel = glm::dvec3(xpos, ypos, 1.0f);
+    glm::dvec3 mouse_mandel = pixel_to_mandel * mouse_pixel;
     mouse_mandel /= mouse_mandel.z;
     
     float temp_scale = (yoffset > 0) ? scale_factor : 1.0 / scale_factor;
 
     // move mouse to origin
-    glm::mat3 trans = glm::translate(glm::mat3(1.0f), glm::vec2(-mouse_mandel.x, -mouse_mandel.y));
+    glm::dmat3 trans = glm::translate(glm::dmat3(1.0f), glm::dvec2(-mouse_mandel.x, -mouse_mandel.y));
     // scale
-    glm::mat3 scale = glm::scale(glm::mat3(1.0f), glm::vec2(temp_scale));
+    glm::dmat3 scale = glm::scale(glm::dmat3(1.0f), glm::dvec2(temp_scale));
     // move back
-    glm::mat3 trans_back = glm::translate(glm::mat3(1.0f), glm::vec2(mouse_mandel.x, mouse_mandel.y));
+    glm::dmat3 trans_back = glm::translate(glm::dmat3(1.0f), glm::dvec2(mouse_mandel.x, mouse_mandel.y));
     // apply to pixel_to_mandel
     pixel_to_mandel = trans_back * scale * trans * pixel_to_mandel;
 }
