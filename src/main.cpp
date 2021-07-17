@@ -7,12 +7,7 @@
 #include <GLFW/glfw3.h>
 
 #include "shader.h"
-
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/matrix_transform_2d.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtx/string_cast.hpp>
+#include "camera.h"
 
 #include <iostream>
 #include <vector>
@@ -23,65 +18,21 @@ const std::string fragment_path = "src/shader.frag";
 const int width = 1280;
 const int heigth = 720;
 
-glm::mat3 pixel_to_mandel;
-const float scale_factor = 0.9;
-bool drag_started = false;
-double prev_cursor_x, prev_cursor_y;
-
+Camera camera = Camera((float)width, (float)heigth);
 
 static void zoom_by_scrolling_callback(GLFWwindow* window, double xoffset, double yoffset);
 static void drag_translation_callback(GLFWwindow* window, int button, int action, int mods);
 void get_cursor_pos(GLFWwindow* window, double& xpos, double& ypos);
+
+GLFWwindow* setup();
 static void glfw_error_callback(int error, const char* description);
 
 int main(int, char**)
 {
-    // Setup window
-    glfwSetErrorCallback(glfw_error_callback);
-    if (!glfwInit())
-        return 1;
-
-    // Decide GL+GLSL versions
-    const char* glsl_version = "#version 330";
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_FALSE);
-#ifdef __APPLE__
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // Required on Mac
-#endif
-
-    // Create window with graphics context
-    GLFWwindow* window = glfwCreateWindow(width, heigth, "ray marching", NULL, NULL);
-    if (window == NULL)
-        return 1;
-    glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); // Enable vsync
-
-    // Initialize OpenGL loader
-    bool err = gladLoadGL(glfwGetProcAddress) == 0;
-    if (err)
-    {
-        fprintf(stderr, "Failed to initialize OpenGL loader!\n");
-        return 1;
-    }
+    GLFWwindow* window = setup();
 
     glfwSetScrollCallback(window, zoom_by_scrolling_callback);
     glfwSetMouseButtonCallback(window, drag_translation_callback);
-
-    // Setup Dear ImGui context
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.IniFilename = NULL; // don't make imgui.ini file after running application
-
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-
-    // Setup Platform/Renderer backends
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init(glsl_version);
 
     // Shader shader = Shader(vertex_path, fragment_path);
     Shader shader = Shader(vertex_path, fragment_path);
@@ -119,11 +70,6 @@ int main(int, char**)
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    // for the mandelbrot starting range is; x: [-2.5, 1.0], y: [-1.0, 1.0]
-    glm::mat3 scale_matrix = glm::scale(glm::mat3(1.0f), glm::vec2(3.5f / (float)width, 2.0f / (float)heigth));
-    glm::mat3 translate_matrix = glm::translate(glm::mat3(1.0f), glm::vec2(-2.5f, -1.0f));
-    pixel_to_mandel = translate_matrix * scale_matrix * glm::mat3(1.0f);
-
     // Our state
     bool show_demo_window = false;
     int num_colors = 4;
@@ -142,23 +88,10 @@ int main(int, char**)
     while (!glfwWindowShouldClose(window))
     {
         glfwPollEvents();
-        if (drag_started)
-        {
-            double xpos, ypos;
-            get_cursor_pos(window, xpos, ypos);
 
-            double xdiff = prev_cursor_x - xpos;
-            double ydiff = prev_cursor_y - ypos;
-            // only works because only scaling and translations are used
-            xdiff *= pixel_to_mandel[0][0];
-            ydiff *= pixel_to_mandel[1][1];
-
-            prev_cursor_x = xpos;
-            prev_cursor_y = ypos;
-
-            glm::mat3 trans = glm::translate(glm::mat3(1.0f), glm::vec2(xdiff, ydiff));
-            pixel_to_mandel = trans * pixel_to_mandel;
-        }
+        double xpos, ypos;
+        get_cursor_pos(window, xpos, ypos);
+        camera.drag_update(xpos, ypos);
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -185,8 +118,6 @@ int main(int, char**)
         }
         if (show_demo_window) { ImGui::ShowDemoWindow(&show_demo_window); }
 
-
-
         // Rendering
         ImGui::Render();
         int display_w, display_h;
@@ -197,8 +128,7 @@ int main(int, char**)
 
         shader.use();
 
-        unsigned int uniform_buf = glGetUniformLocation(shader.ID, "pixel_to_mandel");
-        glUniformMatrix3fv(uniform_buf, 1, GL_FALSE, glm::value_ptr(pixel_to_mandel));
+        camera.move_camera_matrix_to_gpu(shader.ID);
 
         unsigned int sin_buf = glGetUniformLocation(shader.ID, "coloring_shift");
         glUniform1f(sin_buf, coloring_shift);
@@ -230,20 +160,7 @@ static void zoom_by_scrolling_callback(GLFWwindow* window, double xoffset, doubl
     double xpos, ypos;
     get_cursor_pos(window, xpos, ypos);
     
-    glm::vec3 mouse_pixel = glm::vec3(xpos, ypos, 1.0f);
-    glm::vec3 mouse_mandel = pixel_to_mandel * mouse_pixel;
-    mouse_mandel /= mouse_mandel.z;
-    
-    float temp_scale = (yoffset > 0) ? scale_factor : 1.0 / scale_factor;
-
-    // move mouse to origin
-    glm::mat3 trans = glm::translate(glm::mat3(1.0f), glm::vec2(-mouse_mandel.x, -mouse_mandel.y));
-    // scale
-    glm::mat3 scale = glm::scale(glm::mat3(1.0f), glm::vec2(temp_scale));
-    // move back
-    glm::mat3 trans_back = glm::translate(glm::mat3(1.0f), glm::vec2(mouse_mandel.x, mouse_mandel.y));
-    // apply to pixel_to_mandel
-    pixel_to_mandel = trans_back * scale * trans * pixel_to_mandel;
+    camera.zoom_at_point(xpos, ypos, yoffset);
 }
 
 static void drag_translation_callback(GLFWwindow* window, int button, int action, int mods)
@@ -258,15 +175,13 @@ static void drag_translation_callback(GLFWwindow* window, int button, int action
                 double xpos, ypos;
                 get_cursor_pos(window, xpos, ypos);
 
-                prev_cursor_x = xpos;
-                prev_cursor_y = ypos;
+                camera.drag_start(xpos, ypos);
 
-                drag_started = true;
             }
         }
         else if (action == GLFW_RELEASE)
         {
-            drag_started = false;
+            camera.drag_end();
         }
     }
 }
@@ -278,6 +193,53 @@ void get_cursor_pos(GLFWwindow* window, double& xpos, double& ypos)
 
     glfwGetCursorPos(window, &xpos, &ypos);
     ypos = (double)display_h - ypos; // set origin to bottom left
+}
+
+GLFWwindow* setup()
+{
+    // Setup window
+    glfwSetErrorCallback(glfw_error_callback);
+    if (!glfwInit()) { std::exit(EXIT_FAILURE); }
+
+    // Decide GL+GLSL versions
+    const char* glsl_version = "#version 330";
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_SCALE_TO_MONITOR, GLFW_FALSE);
+#ifdef __APPLE__
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // Required on Mac
+#endif
+
+    // Create window with graphics context
+    GLFWwindow* window = glfwCreateWindow(width, heigth, "ray marching", NULL, NULL);
+    if (window == NULL) { std::exit(EXIT_FAILURE); }
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1); // Enable vsync
+
+    // Initialize OpenGL loader
+    bool err = gladLoadGL(glfwGetProcAddress) == 0;
+    if (err)
+    {
+        fprintf(stderr, "Failed to initialize OpenGL loader!\n");
+        std::exit(EXIT_FAILURE);
+    }
+
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.IniFilename = NULL; // don't make imgui.ini file after running application
+
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init(glsl_version);
+
+    return window;
 }
 
 static void glfw_error_callback(int error, const char* description)
