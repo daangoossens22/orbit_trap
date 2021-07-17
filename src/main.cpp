@@ -15,6 +15,7 @@
 #include <glm/gtx/string_cast.hpp>
 
 #include <iostream>
+#include <vector>
 
 const std::string vertex_path = "src/shader.vert";
 const std::string fragment_path = "src/shader.frag";
@@ -125,7 +126,17 @@ int main(int, char**)
 
     // Our state
     bool show_demo_window = false;
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    int num_colors = 4;
+    std::vector<ImVec4> palette;
+    palette.push_back(ImVec4(0.92f, 0.86f, 0.86f, 1.0f));
+    palette.push_back(ImVec4(0.55f, 0.19f, 0.19f, 1.0f));
+    palette.push_back(ImVec4(0.94f, 0.87f, 0.47f, 1.0f));
+    palette.push_back(ImVec4(0.09f, 0.36f, 0.55f, 1.0f));
+    palette.push_back(ImVec4(0.0f, 0.0f, 1.0f, 1.0f));
+    palette.push_back(ImVec4(0.0f, 0.0f, 1.0f, 1.0f));
+    palette.push_back(ImVec4(0.0f, 0.0f, 1.0f, 1.0f));
+    palette.push_back(ImVec4(0.0f, 0.0f, 1.0f, 1.0f));
+    float coloring_shift = 1.1111f;
 
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -159,7 +170,15 @@ int main(int, char**)
             ImGui::Begin("Hello, world!");
 
             ImGui::Checkbox("Demo Window", &show_demo_window);
-            ImGui::ColorEdit3("clear color", (float*)&clear_color);
+            ImGui::SliderInt("num palette colors", &num_colors, 1, 8);
+            for (int i = 0; i < num_colors; i++)
+            {
+                std::string label_name = "palette color " + std::to_string(i);
+                ImGui::ColorEdit3(label_name.c_str(), (float*)&palette[i]);
+            }
+
+            ImGui::SliderFloat("coloring shift", &coloring_shift, 0.0f, 6.3f);
+
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
             ImGui::End();
@@ -173,13 +192,19 @@ int main(int, char**)
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
-        glClearColor(clear_color.x, clear_color.y, clear_color.z, 1.0);
+        glClearColor(0.0, 0.6, 1.0, 1.0); // cyany color
         glClear(GL_COLOR_BUFFER_BIT);
 
         shader.use();
 
         unsigned int uniform_buf = glGetUniformLocation(shader.ID, "pixel_to_mandel");
         glUniformMatrix3fv(uniform_buf, 1, GL_FALSE, glm::value_ptr(pixel_to_mandel));
+
+        unsigned int sin_buf = glGetUniformLocation(shader.ID, "coloring_shift");
+        glUniform1f(sin_buf, coloring_shift);
+
+        glUniform1i(glGetUniformLocation(shader.ID, "num_colors"), num_colors);
+        glUniform4fv(glGetUniformLocation(shader.ID, "palette"), num_colors * 4, (float*)&palette[0]);
 
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
@@ -227,13 +252,17 @@ static void drag_translation_callback(GLFWwindow* window, int button, int action
     {
         if (action == GLFW_PRESS)
         {
-            double xpos, ypos;
-            get_cursor_pos(window, xpos, ypos);
+            ImGuiIO& io = ImGui::GetIO(); (void)io;
+            if (!io.WantCaptureMouse) // check if mouse is not over imgui window
+            {
+                double xpos, ypos;
+                get_cursor_pos(window, xpos, ypos);
 
-            prev_cursor_x = xpos;
-            prev_cursor_y = ypos;
+                prev_cursor_x = xpos;
+                prev_cursor_y = ypos;
 
-            drag_started = true;
+                drag_started = true;
+            }
         }
         else if (action == GLFW_RELEASE)
         {

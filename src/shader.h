@@ -17,4 +17,4 @@ class Shader
         unsigned int load_shader(std::string path, GLenum type);
 };
 
-#endif
+#endif // SHADER_H

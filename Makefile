@@ -9,7 +9,7 @@ SRC_DIR = src
 BUILD_DIR = build
 $(info $(shell mkdir -p $(BUILD_DIR)))
 
-CXXFLAGS = -g -Wall -Wextra
+CXXFLAGS = -g -Wall -Wextra -Wno-unused-parameter
 LDLIBS =
 
 # SOURCES = src/main.cpp src/shader.cpp
