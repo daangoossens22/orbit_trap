@@ -31,6 +31,11 @@ void get_cursor_pos(GLFWwindow* window, double& xpos, double& ypos);
 GLFWwindow* setup();
 static void glfw_error_callback(int error, const char* description);
 
+bool change_orbit_point_pos[2 * MAX_ORBIT_POINTS] = { false } ;
+int num_orbit_points = 1;
+float orbit_points[2 * MAX_ORBIT_POINTS] = { 0.0f };
+
+
 int main(int, char**)
 {
     GLFWwindow* window = setup();
@@ -88,8 +93,6 @@ int main(int, char**)
     float coloring_shift = 1.1111f;
 
     bool draw_orbit_points = true;
-    int num_orbit_points = 1;
-    float orbit_points[40] = { 0.0f };
     ImVec4 orbit_point_color = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
 
     // Main loop
@@ -122,7 +125,8 @@ int main(int, char**)
 
             ImGui::Checkbox("draw orbit points", &draw_orbit_points);
             ImGui::ColorEdit3("orbit_point_color", (float*)&orbit_point_color);
-            ImGui::SliderFloat2("orbit point 0", &orbit_points[0], -1.0f, 1.0f);
+            ImGui::Checkbox("set orbit point 0 position (right mouse click)", &change_orbit_point_pos[0]);
+            // ImGui::SliderFloat2("orbit point 0", &orbit_points[0], -1.0f, 1.0f);
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
@@ -199,6 +203,20 @@ static void drag_translation_callback(GLFWwindow* window, int button, int action
         else if (action == GLFW_RELEASE)
         {
             camera.drag_end();
+        }
+    }
+    else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
+    {
+        double xpos, ypos;
+        get_cursor_pos(window, xpos, ypos);
+        glm::vec2 pos_orbit_point = camera.convert_pixel_to_mandel(xpos, ypos);
+        for (int i = 0; i < num_orbit_points; ++i)
+        {
+            if (change_orbit_point_pos[i])
+            {
+                orbit_points[2 * i] = pos_orbit_point.x;
+                orbit_points[2 * i + 1] = pos_orbit_point.y;
+            }
         }
     }
 }

@@ -11,6 +11,8 @@ class Camera
     public:
         Camera(float screen_width, float screen_heigth);
 
+        glm::vec2 convert_pixel_to_mandel(double xpos, double ypos);
+
         void move_camera_matrix_to_gpu(unsigned int shader_id);
 
         void drag_start(double xpos, double ypos);

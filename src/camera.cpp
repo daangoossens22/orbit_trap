@@ -13,6 +13,14 @@ Camera::Camera(float screen_width, float screen_heigth)
     pixel_to_mandel = translate_matrix * scale_matrix * glm::mat3(1.0f);
 }
 
+glm::vec2 Camera::convert_pixel_to_mandel(double xpos, double ypos)
+{
+    glm::vec3 mouse_pixel = glm::vec3(xpos, ypos, 1.0f);
+    glm::vec3 mouse_mandel = pixel_to_mandel * mouse_pixel;
+    mouse_mandel /= mouse_mandel.z;
+    return glm::vec2(mouse_mandel.x, mouse_mandel.y);
+}
+
 void Camera::move_camera_matrix_to_gpu(unsigned int shader_id)
 {
     unsigned int uniform_buf = glGetUniformLocation(shader_id, "pixel_to_mandel");
@@ -52,9 +60,7 @@ void Camera::drag_update(double xpos, double ypos)
 
 void Camera::zoom_at_point(double xpos, double ypos, double yoffset)
 {
-    glm::vec3 mouse_pixel = glm::vec3(xpos, ypos, 1.0f);
-    glm::vec3 mouse_mandel = pixel_to_mandel * mouse_pixel;
-    mouse_mandel /= mouse_mandel.z;
+    glm::vec2 mouse_mandel = convert_pixel_to_mandel(xpos, ypos);
     
     float temp_scale = (yoffset > 0) ? scale_factor : 1.0 / scale_factor;
 
