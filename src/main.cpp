@@ -115,7 +115,7 @@ int main(int, char**)
 
             ImGui::Checkbox("Demo Window", &show_demo_window);
             ImGui::SliderInt("num palette colors", &num_palette_colors, 1, 8);
-            for (int i = 0; i < num_palette_colors; i++)
+            for (int i = 0; i < num_palette_colors; ++i)
             {
                 std::string label_name = "palette color " + std::to_string(i);
                 ImGui::ColorEdit3(label_name.c_str(), (float*)&palette[i]);
@@ -125,8 +125,13 @@ int main(int, char**)
 
             ImGui::Checkbox("draw orbit points", &draw_orbit_points);
             ImGui::ColorEdit3("orbit_point_color", (float*)&orbit_point_color);
-            ImGui::Checkbox("set orbit point 0 position (right mouse click)", &change_orbit_point_pos[0]);
-            // ImGui::SliderFloat2("orbit point 0", &orbit_points[0], -1.0f, 1.0f);
+            ImGui::Text("set the orbit point position with the right mouse button");
+            ImGui::SliderInt("num orbit points", &num_orbit_points, 0, MAX_ORBIT_POINTS);
+            for (int i = 0; i < num_orbit_points; ++i)
+            {
+                std::string label_name = "set orbit point " + std::to_string(i);
+                ImGui::Checkbox(label_name.c_str(), &change_orbit_point_pos[i]);
+            }
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
@@ -178,10 +183,14 @@ int main(int, char**)
 
 static void zoom_by_scrolling_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    double xpos, ypos;
-    get_cursor_pos(window, xpos, ypos);
-    
-    camera.zoom_at_point(xpos, ypos, yoffset);
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    if (!io.WantCaptureMouse) // check if mouse is not over imgui window
+    {
+        double xpos, ypos;
+        get_cursor_pos(window, xpos, ypos);
+        
+        camera.zoom_at_point(xpos, ypos, yoffset);
+    }
 }
 
 static void drag_translation_callback(GLFWwindow* window, int button, int action, int mods)

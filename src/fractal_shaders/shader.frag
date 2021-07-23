@@ -23,6 +23,34 @@ float length_squared(vec2 vector)
   return vector.x * vector.x + vector.y * vector.y;
 }
 
+vec3 orbit_trap(float squared_dist)
+{
+  // if (iteration != max_iterations) { return vec3(0.0); }
+  float n = sqrt(squared_dist);
+  // return palette[(int(8.5 * n) % 3) + 1].xyz;
+  // TODO try picking a hue instead of using a color palette
+  // if (n < 0.01 * coloring_shift) { return palette[0].xyz; } // trapcolor // TODO add blending
+  // if (n < 0.01 * coloring_shift) { return mix(palette[0].xyz, palette[1].xyz, 100*n); } // trapcolor // TODO add blending
+  float indexx = (coloring_shift * n);
+  float n_colors = num_palette_colors - 1;
+  indexx -= int(indexx / n_colors) * n_colors;
+  int col1 = int(indexx);
+  int col2 = int(indexx + 1.0) % int(n_colors);
+  float a = indexx - float(col1);
+  return mix(palette[col1 + 1].xyz, palette[col2 + 1].xyz, a);
+}
+
+vec3 orbit_trap_multiple_points(float dist[MAX_ORBIT_POINTS])
+{
+  vec3 sum = vec3(0.0f);
+  for (int i = 0; i < num_orbit_points; i++)
+  {
+    sum += orbit_trap(dist[i]);
+  }
+  sum /= num_orbit_points;
+  return sum;
+}
+
 vec3 mandelbrot(vec2 coord)
 {
   vec2 z = vec2(0.0);
@@ -41,7 +69,7 @@ vec3 mandelbrot(vec2 coord)
     z = vec2(z.x * z.x - z.y * z.y + coord.x, 2.0 * z.x * z.y + coord.y);
     iteration++;
 
-    for (int i = 0; i < MAX_ORBIT_POINTS; i++)
+    for (int i = 0; i < num_orbit_points; i++)
     {
       dist_min[i] = min(dist_min[i], length_squared(z - orbit_points[i]));
       dist_max[i] = max(dist_max[i], length_squared(z - orbit_points[i]));
@@ -57,6 +85,8 @@ vec3 mandelbrot(vec2 coord)
     //   return cols[iteration % 4];
     // }
   }
+  return orbit_trap_multiple_points(dist_min);
+  // return orbit_trap_multiple_points(dist_max);
 
   // float n = sqrt(dist);
   // float a = 16.0;
@@ -75,20 +105,6 @@ vec3 mandelbrot(vec2 coord)
   // float zoom = 20.0 * abs(loc1.y - loc2.y);
   // float indexx = (coloring_shift * n / zoom);
   
-  // if (iteration != max_iterations) { return vec3(0.0); }
-  float n = sqrt(dist_min[0]);
-  // return palette[(int(8.5 * n) % 3) + 1].xyz;
-  // TODO try picking a hue instead of using a color palette
-  // if (n < 0.01 * coloring_shift) { return palette[0].xyz; } // trapcolor // TODO add blending
-  // if (n < 0.01 * coloring_shift) { return mix(palette[0].xyz, palette[1].xyz, 100*n); } // trapcolor // TODO add blending
-  float indexx = (coloring_shift * n);
-  float n_colors = num_palette_colors - 1;
-  indexx -= int(indexx / n_colors) * n_colors;
-  int col1 = int(indexx);
-  int col2 = int(indexx + 1.0) % int(n_colors);
-  float a = indexx - float(col1);
-  return mix(palette[col1 + 1].xyz, palette[col2 + 1].xyz, a);
-
   // float n = sqrt(dist);
   // float a = 16.0;
   // float r = 0.5 * sin(a * n) + 0.5;
