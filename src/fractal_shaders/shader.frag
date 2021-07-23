@@ -2,12 +2,21 @@
 
 precision highp float;
 
+// variables shared with main.cpp
+const int MAX_ORBIT_POINTS = 20;
+const int MAX_PALETTE_COLORS = 20;
+
 const int max_iterations = 2048;
 uniform mat3 pixel_to_mandel;
 
 uniform float coloring_shift;
-uniform int num_colors;
-uniform vec4 palette[20];
+uniform int num_palette_colors;
+uniform vec4 palette[MAX_PALETTE_COLORS];
+
+uniform bool draw_orbit_points;
+uniform vec2 orbit_points[MAX_ORBIT_POINTS];
+uniform int num_orbit_points;
+uniform vec4 orbit_point_color;
 
 float length_squared(vec2 vector)
 {
@@ -18,15 +27,26 @@ vec3 mandelbrot(vec2 coord)
 {
   vec2 z = vec2(0.0);
   int iteration = 0;
-  float dist = 1e20f;
-  float dist_max = 0.0;
-  vec2 point = vec2(0.0);
+
+  float dist_min[MAX_ORBIT_POINTS];
+  float dist_max[MAX_ORBIT_POINTS];
+  for (int i = 0; i < MAX_ORBIT_POINTS; i++)
+  {
+    dist_min[i] = 1e20f;
+    dist_max[i] = 0.0f;
+  }
+
   while (iteration < max_iterations && length(z) < 2.0)
   {
     z = vec2(z.x * z.x - z.y * z.y + coord.x, 2.0 * z.x * z.y + coord.y);
     iteration++;
-    dist = min(dist, length_squared(z - point));
-    dist_max = max(dist, length_squared(z - point));
+
+    for (int i = 0; i < MAX_ORBIT_POINTS; i++)
+    {
+      dist_min[i] = min(dist_min[i], length_squared(z - orbit_points[i]));
+      dist_max[i] = max(dist_max[i], length_squared(z - orbit_points[i]));
+    }
+
     // if(length(z - point) < 0.1)
     // {
     //   vec3 cols[4];
@@ -46,13 +66,23 @@ vec3 mandelbrot(vec2 coord)
   //   col += (0.5 * sin(a * n + float(i) * coloring_shift) + 0.5) * palette[i].xyz;
   // }
   // return col;
+
+  // change the shift with the zoom level
+  // vec3 loc1 = pixel_to_mandel * vec3(0.0, 0.0, 1.0);
+  // vec3 loc2 = pixel_to_mandel * vec3(0.0, 720.0, 1.0);
+  // loc1 = loc1 / loc1.z;
+  // loc2 = loc2 / loc2.z;
+  // float zoom = 20.0 * abs(loc1.y - loc2.y);
+  // float indexx = (coloring_shift * n / zoom);
   
   // if (iteration != max_iterations) { return vec3(0.0); }
-  float n = sqrt(dist);
+  float n = sqrt(dist_min[0]);
   // return palette[(int(8.5 * n) % 3) + 1].xyz;
-  if (n < 0.01 * coloring_shift) { return palette[0].xyz; } // trapcolor // TODO add blending
+  // TODO try picking a hue instead of using a color palette
+  // if (n < 0.01 * coloring_shift) { return palette[0].xyz; } // trapcolor // TODO add blending
+  // if (n < 0.01 * coloring_shift) { return mix(palette[0].xyz, palette[1].xyz, 100*n); } // trapcolor // TODO add blending
   float indexx = (coloring_shift * n);
-  float n_colors = 3.0f;
+  float n_colors = num_palette_colors - 1;
   indexx -= int(indexx / n_colors) * n_colors;
   int col1 = int(indexx);
   int col2 = int(indexx + 1.0) % int(n_colors);
@@ -116,6 +146,22 @@ void main()
   vec2 coords = coords_temp.xy / coords_temp.z; // remove homogeneous coordinate
 
   vec3 colour = mandelbrot(coords);
+
+  if (draw_orbit_points)
+  {
+    vec3 max_heigth = pixel_to_mandel * vec3(0.0f, 720.0f, 1.0f);
+    vec3 min_heigth = pixel_to_mandel * vec3(0.0f, 0.0f, 1.0f);
+    float height = abs(max_heigth.y - min_heigth.y) / 2.0f;
+
+    for (int i = 0; i < num_orbit_points; i++)
+    {
+      if (length(coords - orbit_points[i]) < 0.01 * height)
+      {
+        colour = orbit_point_color.xyz;
+      }
+    }
+  }
+
   gl_FragColor = vec4(colour, 1.0);
 
   // gl_FragColor = vec4(0.0, 0.6, 1.0, 1.0);

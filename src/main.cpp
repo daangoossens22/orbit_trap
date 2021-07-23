@@ -12,8 +12,12 @@
 #include <iostream>
 #include <vector>
 
-const std::string vertex_path = "src/shader.vert";
-const std::string fragment_path = "src/shader.frag";
+// variables shared with shader
+const int MAX_ORBIT_POINTS = 20;
+const int MAX_PALETTE_COLORS = 20;
+
+const std::string fractal_vertex_path = "src/fractal_shaders/shader.vert";
+const std::string fractal_fragment_path = "src/fractal_shaders/shader.frag";
 
 const int width = 1280;
 const int heigth = 720;
@@ -34,8 +38,7 @@ int main(int, char**)
     glfwSetScrollCallback(window, zoom_by_scrolling_callback);
     glfwSetMouseButtonCallback(window, drag_translation_callback);
 
-    // Shader shader = Shader(vertex_path, fragment_path);
-    Shader shader = Shader(vertex_path, fragment_path);
+    Shader shader = Shader(fractal_vertex_path, fractal_fragment_path);
 
     // fill screen with quad (rectangle/2 triangles)
     float vertices[] =
@@ -72,7 +75,7 @@ int main(int, char**)
 
     // Our state
     bool show_demo_window = false;
-    int num_colors = 4;
+    int num_palette_colors = 4;
     std::vector<ImVec4> palette;
     palette.push_back(ImVec4(0.92f, 0.86f, 0.86f, 1.0f));
     palette.push_back(ImVec4(0.55f, 0.19f, 0.19f, 1.0f));
@@ -83,6 +86,11 @@ int main(int, char**)
     palette.push_back(ImVec4(0.0f, 0.0f, 1.0f, 1.0f));
     palette.push_back(ImVec4(0.0f, 0.0f, 1.0f, 1.0f));
     float coloring_shift = 1.1111f;
+
+    bool draw_orbit_points = true;
+    int num_orbit_points = 1;
+    float orbit_points[40] = { 0.0f };
+    ImVec4 orbit_point_color = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
 
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -103,14 +111,18 @@ int main(int, char**)
             ImGui::Begin("Hello, world!");
 
             ImGui::Checkbox("Demo Window", &show_demo_window);
-            ImGui::SliderInt("num palette colors", &num_colors, 1, 8);
-            for (int i = 0; i < num_colors; i++)
+            ImGui::SliderInt("num palette colors", &num_palette_colors, 1, 8);
+            for (int i = 0; i < num_palette_colors; i++)
             {
                 std::string label_name = "palette color " + std::to_string(i);
                 ImGui::ColorEdit3(label_name.c_str(), (float*)&palette[i]);
             }
 
             ImGui::SliderFloat("coloring shift", &coloring_shift, 0.0f, 6.3f);
+
+            ImGui::Checkbox("draw orbit points", &draw_orbit_points);
+            ImGui::ColorEdit3("orbit_point_color", (float*)&orbit_point_color);
+            ImGui::SliderFloat2("orbit point 0", &orbit_points[0], -1.0f, 1.0f);
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
@@ -133,8 +145,13 @@ int main(int, char**)
         unsigned int sin_buf = glGetUniformLocation(shader.ID, "coloring_shift");
         glUniform1f(sin_buf, coloring_shift);
 
-        glUniform1i(glGetUniformLocation(shader.ID, "num_colors"), num_colors);
-        glUniform4fv(glGetUniformLocation(shader.ID, "palette"), num_colors * 4, (float*)&palette[0]);
+        glUniform1i(glGetUniformLocation(shader.ID, "num_palette_colors"), num_palette_colors);
+        glUniform4fv(glGetUniformLocation(shader.ID, "palette"), num_palette_colors, (float*)&palette[0]);
+
+        glUniform1i(glGetUniformLocation(shader.ID, "draw_orbit_points"), (int)draw_orbit_points);
+        glUniform4fv(glGetUniformLocation(shader.ID, "orbit_point_color"), 1, (float*)&orbit_point_color);
+        glUniform2fv(glGetUniformLocation(shader.ID, "orbit_points"), 20 * 2, &orbit_points[0]);
+        glUniform1i(glGetUniformLocation(shader.ID, "num_orbit_points"), num_orbit_points);
 
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);

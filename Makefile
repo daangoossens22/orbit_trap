@@ -1,7 +1,7 @@
 # dynamic prerequisites on system:
 # - glfw
 
-EXEC = ray_marching
+EXEC = orbit_trap
 
 IMGUI_DIR = imgui
 GLAD_DIR = glad
