@@ -1,5 +1,6 @@
 # dynamic prerequisites on system:
 # - glfw
+# - freeimage
 
 EXEC = orbit_trap
 
@@ -10,7 +11,7 @@ BUILD_DIR = build
 $(info $(shell mkdir -p $(BUILD_DIR)))
 
 CXXFLAGS = -g -Wall -Wextra -Wno-unused-parameter
-LDLIBS =
+LDLIBS = -lfreeimage
 
 # SOURCES = src/main.cpp src/shader.cpp src/camera.cpp
 SOURCES = $(shell find $(SRC_DIR) -name *.cpp) # gets all cpp files in SRC_DIR

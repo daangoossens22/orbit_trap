@@ -40,6 +40,7 @@ vec3 orbit_trap(float squared_dist)
   return mix(palette[col1 + 1].xyz, palette[col2 + 1].xyz, a);
 }
 
+// average the color over all the orbit points
 vec3 orbit_trap_multiple_points(float dist[MAX_ORBIT_POINTS])
 {
   vec3 sum = vec3(0.0f);
@@ -47,8 +48,7 @@ vec3 orbit_trap_multiple_points(float dist[MAX_ORBIT_POINTS])
   {
     sum += orbit_trap(dist[i]);
   }
-  sum /= num_orbit_points;
-  return sum;
+  return sum / num_orbit_points;
 }
 
 vec3 mandelbrot(vec2 coord)
@@ -75,16 +75,8 @@ vec3 mandelbrot(vec2 coord)
       dist_max[i] = max(dist_max[i], length_squared(z - orbit_points[i]));
     }
 
-    // if(length(z - point) < 0.1)
-    // {
-    //   vec3 cols[4];
-    //   cols[0] = vec3(1.0, 0.0, 0.0);
-    //   cols[1] = vec3(0.0, 1.0, 0.0);
-    //   cols[2] = vec3(0.0, 0.0, 1.0);
-    //   cols[3] = vec3(1.0, 1.0, 1.0);
-    //   return cols[iteration % 4];
-    // }
   }
+
   return orbit_trap_multiple_points(dist_min);
   // return orbit_trap_multiple_points(dist_max);
 

@@ -12,12 +12,17 @@
 #include <iostream>
 #include <vector>
 
+// save and convert the image from the opengl buffer to some image format
+#include <FreeImage.h>
+
 // variables shared with shader
 const int MAX_ORBIT_POINTS = 20;
 const int MAX_PALETTE_COLORS = 20;
 
 const std::string fractal_vertex_path = "src/fractal_shaders/shader.vert";
 const std::string fractal_fragment_path = "src/fractal_shaders/shader.frag";
+
+const char* image_save_path = "output_image.png";
 
 const int width = 1280;
 const int heigth = 720;
@@ -31,9 +36,24 @@ void get_cursor_pos(GLFWwindow* window, double& xpos, double& ypos);
 GLFWwindow* setup();
 static void glfw_error_callback(int error, const char* description);
 
-bool change_orbit_point_pos[2 * MAX_ORBIT_POINTS] = { false } ;
+int change_orbit_point_pos = 0;
 int num_orbit_points = 1;
 float orbit_points[2 * MAX_ORBIT_POINTS] = { 0.0f };
+
+
+// TODO
+// 1. center camera button / function / imgui
+// 2. save opengl frame buffer to png (don't overwrite images, make framebuffer 1080p when saving the image, use multiple rays per pixel for saving the image (antialiasing))
+// 3. clean up imgui window (with trees??) and make orbit point selection a list (and color the selected point a different color)
+// 4. orbit lines
+// 5. orbit boxes
+// 6. orbit circles
+// 7. orbit triangles
+// 8. orbit hexagons
+// 9. different fractals (julia sets?, etc.)
+// 10. higher precision mandelbrot without using doubles
+// 11. clean up codebase / refine code functionality
+// 12. be able to drag orbit points instead of only pressing continuously
 
 
 int main(int, char**)
@@ -92,6 +112,8 @@ int main(int, char**)
     palette.push_back(ImVec4(0.0f, 0.0f, 1.0f, 1.0f));
     float coloring_shift = 1.1111f;
 
+    bool save_image = false;
+
     bool draw_orbit_points = true;
     ImVec4 orbit_point_color = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
 
@@ -127,11 +149,22 @@ int main(int, char**)
             ImGui::ColorEdit3("orbit_point_color", (float*)&orbit_point_color);
             ImGui::Text("set the orbit point position with the right mouse button");
             ImGui::SliderInt("num orbit points", &num_orbit_points, 0, MAX_ORBIT_POINTS);
-            for (int i = 0; i < num_orbit_points; ++i)
+            auto label_generator_orbit_points = [](int orbit_point) { return orbit_point ? "orbit point " + std::to_string(orbit_point) : "no orbit point selected"; };
+            if (ImGui::BeginCombo("change orbit point", label_generator_orbit_points(change_orbit_point_pos).c_str(), 0))
             {
-                std::string label_name = "set orbit point " + std::to_string(i);
-                ImGui::Checkbox(label_name.c_str(), &change_orbit_point_pos[i]);
+                for (int i = 0; i < num_orbit_points + 1; i++)
+                {
+                    const bool is_selected = (change_orbit_point_pos == i);
+                    if (ImGui::Selectable(label_generator_orbit_points(i).c_str(), is_selected))
+                    {
+                        change_orbit_point_pos = i;
+                    }
+                    if (is_selected) { ImGui::SetItemDefaultFocus(); }
+                }
+                ImGui::EndCombo();
             }
+
+            ImGui::Checkbox("save image", &save_image);
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
@@ -149,6 +182,7 @@ int main(int, char**)
 
         shader.use();
 
+        // set uniform variables
         camera.move_camera_matrix_to_gpu(shader.ID);
 
         unsigned int sin_buf = glGetUniformLocation(shader.ID, "coloring_shift");
@@ -162,15 +196,37 @@ int main(int, char**)
         glUniform2fv(glGetUniformLocation(shader.ID, "orbit_points"), 20 * 2, &orbit_points[0]);
         glUniform1i(glGetUniformLocation(shader.ID, "num_orbit_points"), num_orbit_points);
 
+        // overwrite some uniform variables
+        if (save_image)
+        {
+            glUniform1i(glGetUniformLocation(shader.ID, "draw_orbit_points"), 0);
+        }
+
+        // render the fractal
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
+        // save image before the imgui widget is drawn to the screen buffer
+        if (save_image)
+        {
+            GLubyte* pixels = new GLubyte[3 * width * heigth];
+            glReadPixels(0, 0, width, heigth, GL_BGR, GL_UNSIGNED_BYTE, pixels);
+
+            FIBITMAP* image = FreeImage_ConvertFromRawBits(pixels, width, heigth, 3 * width, 24, 0x0000FF, 0x00FF00, 0xFF0000, false);
+            FreeImage_Save(FIF_PNG, image, image_save_path, 0);
+            FreeImage_Unload(image);
+            delete[] pixels;
+
+            save_image = false;
+        }
+
+        // draw the imgui windows to the screen
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwSwapBuffers(window);
     }
 
-    // Cleanup
+    // cleanup
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
@@ -181,6 +237,7 @@ int main(int, char**)
     return 0;
 }
 
+// zoom in/out at the mouse position by scrolling
 static void zoom_by_scrolling_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
     ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -195,41 +252,39 @@ static void zoom_by_scrolling_callback(GLFWwindow* window, double xoffset, doubl
 
 static void drag_translation_callback(GLFWwindow* window, int button, int action, int mods)
 {
+    ImGuiIO& io = ImGui::GetIO(); (void)io; // for checking if the mouse is inside any imgui window
+
+    // move around by holding the left mouse button and moving the mouse
     if (button == GLFW_MOUSE_BUTTON_LEFT)
     {
-        if (action == GLFW_PRESS)
+        if (action == GLFW_PRESS && !io.WantCaptureMouse)
         {
-            ImGuiIO& io = ImGui::GetIO(); (void)io;
-            if (!io.WantCaptureMouse) // check if mouse is not over imgui window
-            {
-                double xpos, ypos;
-                get_cursor_pos(window, xpos, ypos);
+            double xpos, ypos;
+            get_cursor_pos(window, xpos, ypos);
 
-                camera.drag_start(xpos, ypos);
-
-            }
+            camera.drag_start(xpos, ypos);
         }
         else if (action == GLFW_RELEASE)
         {
             camera.drag_end();
         }
     }
-    else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS)
+    // place the orbit points by clicking with the right mouse button
+    else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS && !io.WantCaptureMouse)
     {
         double xpos, ypos;
         get_cursor_pos(window, xpos, ypos);
         glm::vec2 pos_orbit_point = camera.convert_pixel_to_mandel(xpos, ypos);
-        for (int i = 0; i < num_orbit_points; ++i)
+        if (!change_orbit_point_pos == 0)
         {
-            if (change_orbit_point_pos[i])
-            {
-                orbit_points[2 * i] = pos_orbit_point.x;
-                orbit_points[2 * i + 1] = pos_orbit_point.y;
-            }
+            int orbit_point_pos_temp = 2 * (change_orbit_point_pos - 1);
+            orbit_points[orbit_point_pos_temp] = pos_orbit_point.x;
+            orbit_points[orbit_point_pos_temp + 1] = pos_orbit_point.y;
         }
     }
 }
 
+// get the current position of the mouse in pixels where (0, 0) is in the bottom left
 void get_cursor_pos(GLFWwindow* window, double& xpos, double& ypos)
 {
     int display_w, display_h;
@@ -239,6 +294,7 @@ void get_cursor_pos(GLFWwindow* window, double& xpos, double& ypos)
     ypos = (double)display_h - ypos; // set origin to bottom left
 }
 
+// setups the glfw window and the opengl context
 GLFWwindow* setup()
 {
     // Setup window
