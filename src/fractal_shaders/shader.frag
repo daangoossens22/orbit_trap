@@ -16,7 +16,10 @@ uniform vec4 palette[MAX_PALETTE_COLORS];
 uniform bool draw_orbit_points;
 uniform vec2 orbit_points[MAX_ORBIT_POINTS];
 uniform int num_orbit_points;
-uniform vec4 orbit_point_color;
+uniform int orbit_point_selected;
+uniform vec4 orbit_point_colors[2];
+// uniform vec4 orbit_point_color;
+// uniform vec4 selected_orbit_point_color;
 
 float length_squared(vec2 vector)
 {
@@ -165,12 +168,10 @@ void main()
     {
       if (length(coords - orbit_points[i]) < 0.01 * height)
       {
-        colour = orbit_point_color.xyz;
+        colour = (i + 1 == orbit_point_selected) ? orbit_point_colors[1].xyz : orbit_point_colors[0].xyz;
       }
     }
   }
 
   gl_FragColor = vec4(colour, 1.0);
-
-  // gl_FragColor = vec4(0.0, 0.6, 1.0, 1.0);
 }

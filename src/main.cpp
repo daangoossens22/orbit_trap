@@ -40,6 +40,7 @@ int change_orbit_point_pos = 0;
 int num_orbit_points = 1;
 float orbit_points[2 * MAX_ORBIT_POINTS] = { 0.0f };
 
+ImGuiMouseCursor_ current_cursor = ImGuiMouseCursor_Arrow;
 
 // TODO
 // 1. center camera button / function / imgui
@@ -115,7 +116,7 @@ int main(int, char**)
     bool save_image = false;
 
     bool draw_orbit_points = true;
-    ImVec4 orbit_point_color = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
+    ImVec4 orbit_point_colors[2] = { ImVec4(1.0f, 0.5f, 0.0f, 1.0f), ImVec4(0.0f, 1.0f, 0.8f, 1.0f) };
 
     // Main loop
     while (!glfwWindowShouldClose(window))
@@ -130,6 +131,8 @@ int main(int, char**)
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+
+        ImGui::SetMouseCursor(current_cursor);
 
         // ImGui windows
         {
@@ -146,7 +149,8 @@ int main(int, char**)
             ImGui::SliderFloat("coloring shift", &coloring_shift, 0.0f, 6.3f);
 
             ImGui::Checkbox("draw orbit points", &draw_orbit_points);
-            ImGui::ColorEdit3("orbit_point_color", (float*)&orbit_point_color);
+            ImGui::ColorEdit3("orbit_point_color", (float*)&orbit_point_colors[0]);
+            ImGui::ColorEdit3("selected orbit_point_color", (float*)&orbit_point_colors[1]);
             ImGui::Text("set the orbit point position with the right mouse button");
             ImGui::SliderInt("num orbit points", &num_orbit_points, 0, MAX_ORBIT_POINTS);
             auto label_generator_orbit_points = [](int orbit_point) { return orbit_point ? "orbit point " + std::to_string(orbit_point) : "no orbit point selected"; };
@@ -192,7 +196,8 @@ int main(int, char**)
         glUniform4fv(glGetUniformLocation(shader.ID, "palette"), num_palette_colors, (float*)&palette[0]);
 
         glUniform1i(glGetUniformLocation(shader.ID, "draw_orbit_points"), (int)draw_orbit_points);
-        glUniform4fv(glGetUniformLocation(shader.ID, "orbit_point_color"), 1, (float*)&orbit_point_color);
+        glUniform4fv(glGetUniformLocation(shader.ID, "orbit_point_colors"), 2, (float*)&orbit_point_colors[0]);
+        glUniform1i(glGetUniformLocation(shader.ID, "orbit_point_selected"), change_orbit_point_pos);
         glUniform2fv(glGetUniformLocation(shader.ID, "orbit_points"), 20 * 2, &orbit_points[0]);
         glUniform1i(glGetUniformLocation(shader.ID, "num_orbit_points"), num_orbit_points);
 
@@ -247,6 +252,8 @@ static void zoom_by_scrolling_callback(GLFWwindow* window, double xoffset, doubl
         get_cursor_pos(window, xpos, ypos);
         
         camera.zoom_at_point(xpos, ypos, yoffset);
+
+        // current_cursor = ImGuiMouseCursor_ResizeNS; // TODO need a good way to reset cursor after scrolling
     }
 }
 
@@ -263,10 +270,13 @@ static void drag_translation_callback(GLFWwindow* window, int button, int action
             get_cursor_pos(window, xpos, ypos);
 
             camera.drag_start(xpos, ypos);
+
+            current_cursor = ImGuiMouseCursor_Hand;
         }
         else if (action == GLFW_RELEASE)
         {
             camera.drag_end();
+            current_cursor = ImGuiMouseCursor_Arrow;
         }
     }
     // place the orbit points by clicking with the right mouse button
