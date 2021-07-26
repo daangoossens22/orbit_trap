@@ -6,10 +6,23 @@
 #include "camera.h"
 
 Camera::Camera(float screen_width, float screen_heigth)
+    :screen_width(screen_width),
+     screen_heigth(screen_heigth)
+{
+    reset();
+}
+
+void Camera::reset()
 {
     // for the mandelbrot starting range is; x: [-2.5, 1.0], y: [-1.0, 1.0]
-    glm::mat3 scale_matrix = glm::scale(glm::mat3(1.0f), glm::vec2(3.5f / screen_width, 2.0f / screen_heigth));
-    glm::mat3 translate_matrix = glm::translate(glm::mat3(1.0f), glm::vec2(-2.5f, -1.0f));
+    set_camera_pos(-2.5, -1.0, 3.5, 2.0);
+}
+
+// view box in range x: [mandel_x, mandel_x + mandel_width], y: [mandel_y, mandel_y + mandel_heigth]
+void Camera::set_camera_pos(float mandel_x, float mandel_y, float mandel_width, float mandel_heigth)
+{
+    glm::mat3 scale_matrix = glm::scale(glm::mat3(1.0f), glm::vec2(mandel_width / screen_width, mandel_heigth / screen_heigth));
+    glm::mat3 translate_matrix = glm::translate(glm::mat3(1.0f), glm::vec2(mandel_x, mandel_y));
     pixel_to_mandel = translate_matrix * scale_matrix * glm::mat3(1.0f);
 }
 

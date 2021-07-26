@@ -39,13 +39,15 @@ static void glfw_error_callback(int error, const char* description);
 int change_orbit_point_pos = 0;
 int num_orbit_points = 1;
 float orbit_points[2 * MAX_ORBIT_POINTS] = { 0.0f };
+bool changing_orbit_points = false;
+
+void update_selected_orbit_point_pos(GLFWwindow* window);
 
 ImGuiMouseCursor_ current_cursor = ImGuiMouseCursor_Arrow;
 
 // TODO
-// 1. center camera button / function / imgui
 // 2. save opengl frame buffer to png (don't overwrite images, make framebuffer 1080p when saving the image, use multiple rays per pixel for saving the image (antialiasing))
-// 3. clean up imgui window (with trees??) and make orbit point selection a list (and color the selected point a different color)
+// 3. clean up imgui window (with trees??)
 // 4. orbit lines
 // 5. orbit boxes
 // 6. orbit circles
@@ -54,7 +56,6 @@ ImGuiMouseCursor_ current_cursor = ImGuiMouseCursor_Arrow;
 // 9. different fractals (julia sets?, etc.)
 // 10. higher precision mandelbrot without using doubles
 // 11. clean up codebase / refine code functionality
-// 12. be able to drag orbit points instead of only pressing continuously
 
 
 int main(int, char**)
@@ -114,6 +115,7 @@ int main(int, char**)
     float coloring_shift = 1.1111f;
 
     bool save_image = false;
+    bool reset_camera = false;
 
     bool draw_orbit_points = true;
     ImVec4 orbit_point_colors[2] = { ImVec4(1.0f, 0.5f, 0.0f, 1.0f), ImVec4(0.0f, 1.0f, 0.8f, 1.0f) };
@@ -127,6 +129,8 @@ int main(int, char**)
         get_cursor_pos(window, xpos, ypos);
         camera.drag_update(xpos, ypos);
 
+        update_selected_orbit_point_pos(window);
+
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
@@ -139,6 +143,9 @@ int main(int, char**)
             ImGui::Begin("Hello, world!");
 
             ImGui::Checkbox("Demo Window", &show_demo_window);
+
+            ImGui::Checkbox("reset camera", &reset_camera);
+
             ImGui::SliderInt("num palette colors", &num_palette_colors, 1, 8);
             for (int i = 0; i < num_palette_colors; ++i)
             {
@@ -175,6 +182,11 @@ int main(int, char**)
             ImGui::End();
         }
         if (show_demo_window) { ImGui::ShowDemoWindow(&show_demo_window); }
+        if (reset_camera)
+        {
+            camera.reset();
+            reset_camera = false;
+        }
 
         // Rendering
         ImGui::Render();
@@ -257,6 +269,23 @@ static void zoom_by_scrolling_callback(GLFWwindow* window, double xoffset, doubl
     }
 }
 
+
+void update_selected_orbit_point_pos(GLFWwindow* window)
+{
+    if (changing_orbit_points)
+    {
+        double xpos, ypos;
+        get_cursor_pos(window, xpos, ypos);
+        glm::vec2 pos_orbit_point = camera.convert_pixel_to_mandel(xpos, ypos);
+        if (!change_orbit_point_pos == 0)
+        {
+            int orbit_point_pos_temp = 2 * (change_orbit_point_pos - 1);
+            orbit_points[orbit_point_pos_temp] = pos_orbit_point.x;
+            orbit_points[orbit_point_pos_temp + 1] = pos_orbit_point.y;
+        }
+    }
+}
+
 static void drag_translation_callback(GLFWwindow* window, int button, int action, int mods)
 {
     ImGuiIO& io = ImGui::GetIO(); (void)io; // for checking if the mouse is inside any imgui window
@@ -280,16 +309,18 @@ static void drag_translation_callback(GLFWwindow* window, int button, int action
         }
     }
     // place the orbit points by clicking with the right mouse button
-    else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS && !io.WantCaptureMouse)
+    else if (button == GLFW_MOUSE_BUTTON_RIGHT)
     {
-        double xpos, ypos;
-        get_cursor_pos(window, xpos, ypos);
-        glm::vec2 pos_orbit_point = camera.convert_pixel_to_mandel(xpos, ypos);
-        if (!change_orbit_point_pos == 0)
+        // TODO select closest point when clicking (when that option is selected)
+        if (action == GLFW_PRESS && !io.WantCaptureMouse)
         {
-            int orbit_point_pos_temp = 2 * (change_orbit_point_pos - 1);
-            orbit_points[orbit_point_pos_temp] = pos_orbit_point.x;
-            orbit_points[orbit_point_pos_temp + 1] = pos_orbit_point.y;
+            changing_orbit_points = true;
+
+            update_selected_orbit_point_pos(window);
+        }
+        else if (action == GLFW_RELEASE)
+        {
+            changing_orbit_points = false;
         }
     }
 }

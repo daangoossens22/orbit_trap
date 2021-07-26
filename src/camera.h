@@ -11,6 +11,9 @@ class Camera
     public:
         Camera(float screen_width, float screen_heigth);
 
+        void reset();
+        void set_camera_pos(float mandel_x, float mandel_y, float mandel_width, float mandel_heigth);
+
         glm::vec2 convert_pixel_to_mandel(double xpos, double ypos);
 
         void move_camera_matrix_to_gpu(unsigned int shader_id);
@@ -22,6 +25,8 @@ class Camera
         void zoom_at_point(double xpos, double ypos, double yoffset);
     private:
         glm::mat3 pixel_to_mandel;
+        float screen_width;
+        float screen_heigth;
         bool drag_started = false;
         double prev_cursor_x, prev_cursor_y;
         const float scale_factor = 0.9;
